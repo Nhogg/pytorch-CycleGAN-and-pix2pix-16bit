@@ -1,7 +1,8 @@
 import os
 
-from mpmath.identification import transforms
-from sympy.printing.pytorch import torch
+import torch
+from torchvision import transforms
+
 
 from data.base_dataset import BaseDataset, get_params, get_transform
 from data.image_folder import make_dataset

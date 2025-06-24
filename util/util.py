@@ -39,22 +39,27 @@ def diagnose_network(net, name='network'):
     print(mean)
 
 
+from PIL import Image
+
 def save_image(image_numpy, image_path, aspect_ratio=1.0) -> None:
-    """Save a numpy image to the disk
+    """Save a numpy image to disk, preserving 16-bit depth."""
+    # Ensure the array is 2D or 3D with shape (H, W)
+    if image_numpy.ndim == 3 and image_numpy.shape[0] == 1:
+        image_numpy = image_numpy[0]  # Remove channel dimension
 
-    Parameters:
-        image_numpy (numpy array) -- input numpy array
-        image_path (str)          -- the path of the image
-    """
+    # Create the PIL image (for 16-bit grayscale)
+    image_pil = Image.fromarray(image_numpy, mode='I;16')
 
-    image_pil = Image.fromarray(image_numpy, mode='I;16').save(image_path)
-    h, w, _ = image_numpy.shape
-
+    # Apply aspect ratio adjustment
+    w, h = image_pil.size
     if aspect_ratio > 1.0:
-        image_pil = image_pil.resize((h, int(w * aspect_ratio)), Image.BICUBIC)
-    if aspect_ratio < 1.0:
-        image_pil = image_pil.resize((int(h / aspect_ratio), w), Image.BICUBIC)
+        image_pil = image_pil.resize((w, int(h * aspect_ratio)), Image.BICUBIC)
+    elif aspect_ratio < 1.0:
+        image_pil = image_pil.resize((int(w / aspect_ratio), h), Image.BICUBIC)
+
+    # Save
     image_pil.save(image_path)
+
 
 
 def print_numpy(x, val=True, shp=False):
