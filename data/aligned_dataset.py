@@ -1,7 +1,12 @@
 import os
+
+from mpmath.identification import transforms
+from sympy.printing.pytorch import torch
+
 from data.base_dataset import BaseDataset, get_params, get_transform
 from data.image_folder import make_dataset
 from PIL import Image
+import numpy as np
 
 
 class AlignedDataset(BaseDataset):
@@ -25,7 +30,8 @@ class AlignedDataset(BaseDataset):
         self.output_nc = self.opt.input_nc if self.opt.direction == 'BtoA' else self.opt.output_nc
 
     def __getitem__(self, index):
-        """Return a data point and its metadata information.
+        """Return a data point and its metadata information, preserving
+        16 bit resolution.
 
         Parameters:
             index - - a random integer for data indexing
@@ -36,24 +42,38 @@ class AlignedDataset(BaseDataset):
             A_paths (str) - - image paths
             B_paths (str) - - image paths (same as A_paths)
         """
-        # read a image given a random integer index
         AB_path = self.AB_paths[index]
-        AB = Image.open(AB_path).convert('RGB')
-        # split AB image into A and B
-        w, h = AB.size
-        w2 = int(w / 2)
-        A = AB.crop((0, 0, w2, h))
-        B = AB.crop((w2, 0, w, h))
+        AB = Image.open(AB_path)
+        AB_np = np.array(AB).astype(np.float32) / 65535.0
 
-        # apply the same transform to both A and B
-        transform_params = get_params(self.opt, A.size)
-        A_transform = get_transform(self.opt, transform_params, grayscale=(self.input_nc == 1))
-        B_transform = get_transform(self.opt, transform_params, grayscale=(self.output_nc == 1))
+        # Split images
+        h, w = AB_np.shape
+        w2 = w // 2
+        A_np = AB_np[:, :w2]
+        B_np = AB_np[:, w2:]
 
-        A = A_transform(A)
-        B = B_transform(B)
+        # Convert to torch tensor with shape [1, H, W]
+        A_tensor = torch.from_numpy(A_np).unsqueeze(0)
+        B_tensor = torch.from_numpy(B_np).unsqueeze(0)
 
-        return {'A': A, 'B': B, 'A_paths': AB_path, 'B_paths': AB_path}
+        # Resize and crop manually
+        preprocess = transforms.Compose([
+            transforms.Resize(self.opt.load_size),
+            transforms.CenterCrop(self.opt.crop_size),
+        ])
+
+        # Apply transform
+        A_pil = transforms.ToPILImage()(A_tensor)
+        B_pil = transforms.ToPILImage()(B_tensor)
+
+        A_pil = A_pil.convert('L')
+        B_pil = B_pil.convert('L')
+
+        A_tensor = transforms.ToTensor()(preprocess(A_pil))
+        B_tensor = transforms.ToTensor()(preprocess(B_pil))
+
+        return {'A': A_tensor, 'B': B_tensor, 'A_paths': AB_path, 'B_paths': AB_path}
+
 
     def __len__(self):
         """Return the total number of images in the dataset."""
