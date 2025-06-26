@@ -79,3 +79,6 @@ class AlignedDataset(BaseDataset):
     def __len__(self):
         """Return the total number of images in the dataset."""
         return len(self.AB_paths)
+
+#C:\Users\natha\Documents\GitHub\pytorch-CycleGAN-and-pix2pix-16bit\datasets\16bit_test
+# python3 test.py --dataroot C:\Users\natha\Documents\GitHub\pytorch-CycleGAN-and-pix2pix-16bit\datasets\16bit_test --name mvScatter16b --preprocess scale_width_and_crop --load_size 1536 --crop_size 512 --model pix2pix --num_test 20 --dataset_mode aligned
