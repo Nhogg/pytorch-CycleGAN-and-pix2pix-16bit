@@ -6,18 +6,36 @@ from PIL import Image
 import os
 
 
-def tensor2im_16bit(input_image):
-    """"Converts a Tensor array into a 16 bit numpy image array.
+def tensor2im_16bit(input_image, imtype=np.uint16):
+    """Converts a Tensor into a 16-bit numpy image array."""
 
-    Parameters:
-        input_image (tensor) --  the input image tensor array
-        imtype (type)        --  the desired type of the converted numpy array
-    """
-    image_tensor = input_image.detach().cpu()[0]
-    image_numpy = image_tensor.numpy()
-    image_numpy = np.clip(image_numpy, 0, 1)
-    image_numpy = (image_numpy * 65535.0).astype(np.uint16)
+    if isinstance(input_image, torch.Tensor):
+        image_tensor = input_image.data
+    else:
+        return input_image
+
+    # Assuming image is 1xCxHxW or CxHxW
+    image_numpy = image_tensor[0].cpu().float().numpy() if image_tensor.ndim == 4 else image_tensor.cpu().float().numpy()
+
+    # Clamp to [-1, 1] or [0, 1] depending on your model
+    image_numpy = np.clip(image_numpy, -1, 1)
+
+    # Convert from [-1, 1] to [0, 65535]
+    image_numpy = ((image_numpy + 1) / 2.0) * 65535.0
+
+    # Convert to uint16
+    image_numpy = np.clip(image_numpy, 0, 65535).astype(imtype)
+
+    # If single-channel, shape = (H, W), expand to (H, W, 1)
+    if image_numpy.ndim == 2:
+        image_numpy = image_numpy[:, :, np.newaxis]
+
+    # Transpose from (C, H, W) to (H, W, C)
+    if image_numpy.shape[0] <= 4:  # assume channel first
+        image_numpy = np.transpose(image_numpy, (1, 2, 0))
+
     return image_numpy
+
 
 
 def diagnose_network(net, name='network'):
@@ -41,24 +59,33 @@ def diagnose_network(net, name='network'):
 
 from PIL import Image
 
-def save_image(image_numpy, image_path, aspect_ratio=1.0) -> None:
-    """Save a numpy image to disk, preserving 16-bit depth."""
-    # Ensure the array is 2D or 3D with shape (H, W)
-    if image_numpy.ndim == 3 and image_numpy.shape[0] == 1:
-        image_numpy = image_numpy[0]  # Remove channel dimension
+from PIL import Image
 
-    # Create the PIL image (for 16-bit grayscale)
-    image_pil = Image.fromarray(image_numpy, mode='I;16')
+from PIL import Image
+import numpy as np
 
-    # Apply aspect ratio adjustment
-    w, h = image_pil.size
-    if aspect_ratio > 1.0:
-        image_pil = image_pil.resize((w, int(h * aspect_ratio)), Image.BICUBIC)
-    elif aspect_ratio < 1.0:
-        image_pil = image_pil.resize((int(w / aspect_ratio), h), Image.BICUBIC)
+def save_image(image_numpy, image_path, aspect_ratio=1.0):
+    """Save a 16-bit numpy image array to disk, handling both grayscale and RGB."""
+    if image_numpy.ndim == 3 and image_numpy.shape[2] == 1:
+        image_numpy = np.squeeze(image_numpy, axis=2)  # (H, W)
+    elif image_numpy.ndim == 3 and image_numpy.shape[2] == 3:
+        pass  # RGB, fine as-is
+    elif image_numpy.ndim == 2:
+        pass  # Already (H, W)
+    else:
+        raise ValueError(f"Unsupported image shape: {image_numpy.shape}")
 
-    # Save
+    image_pil = Image.fromarray(image_numpy)
+
+    if aspect_ratio != 1.0:
+        h, w = image_numpy.shape[0], image_numpy.shape[1]
+        new_w = int(w * aspect_ratio)
+        new_h = int(h)
+        image_pil = image_pil.resize((new_w, new_h), Image.BICUBIC)
+    print(image_path, image_numpy.dtype, image_numpy.min(), image_numpy.max())
     image_pil.save(image_path)
+
+
 
 
 
