@@ -65,25 +65,12 @@ from PIL import Image
 import numpy as np
 
 def save_image(image_numpy, image_path, aspect_ratio=1.0):
-    """Save a 16-bit numpy image array to disk, handling both grayscale and RGB."""
-    if image_numpy.ndim == 3 and image_numpy.shape[2] == 1:
-        image_numpy = np.squeeze(image_numpy, axis=2)  # (H, W)
-    elif image_numpy.ndim == 3 and image_numpy.shape[2] == 3:
-        pass  # RGB, fine as-is
-    elif image_numpy.ndim == 2:
-        pass  # Already (H, W)
-    else:
-        raise ValueError(f"Unsupported image shape: {image_numpy.shape}")
+    if image_numpy.ndim == 3 and image_numpy.shape[0] == 1:
+        image_numpy = np.squeeze(image_numpy, axis=0)
 
-    image_pil = Image.fromarray(image_numpy)
-
-    if aspect_ratio != 1.0:
-        h, w = image_numpy.shape[0], image_numpy.shape[1]
-        new_w = int(w * aspect_ratio)
-        new_h = int(h)
-        image_pil = image_pil.resize((new_w, new_h), Image.BICUBIC)
-    print(image_path, image_numpy.dtype, image_numpy.min(), image_numpy.max())
+    image_pil = Image.fromarray(image_numpy.astype(np.uint16), mode='I;16')
     image_pil.save(image_path)
+
 
 
 

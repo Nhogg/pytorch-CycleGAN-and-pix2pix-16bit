@@ -13,6 +13,8 @@ See our template dataset class 'template_dataset.py' for more details.
 import importlib
 import torch.utils.data
 from data.base_dataset import BaseDataset
+from .aligned_dataset_16bit_dataset import AlignedDataset16BitDataset
+
 
 
 def find_dataset_using_name(dataset_name):

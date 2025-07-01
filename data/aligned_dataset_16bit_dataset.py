@@ -2,11 +2,12 @@ import os
 import numpy as np
 import torch
 from data.base_dataset import BaseDataset
+from datasets.make_dataset_aligned import get_file_paths
 from util import util
 from PIL import Image
 import torchvision.transforms.functional as TF
 
-class AlignedDataset16Bit(BaseDataset):
+class AlignedDataset16BitDataset(BaseDataset):
     """Dataset for 16-bit grayscale image pairs stored side-by-side (AB format)."""
 
     def __init__(self, opt):
@@ -18,12 +19,19 @@ class AlignedDataset16Bit(BaseDataset):
         phase = 'train' if opt.isTrain else 'test'
         return os.path.join(opt.dataroot, phase)
 
-    def make_dataset(self, dir, max_size):
-        paths = []
-        for root, _, fnames in os.walk(dir):
-            for fname in fnames:
-                if fname.endswith('.png') or fname.endswith('.tif'):
-                    paths.append(os.path.join(root, fname))
+    def make_dataset(self, dir, max_size=float("inf")):
+        paths = get_file_paths(dir)
+
+        # If max_size is float('inf'), just return all paths
+        if max_size == float("inf"):
+            return paths
+
+        # Convert to int safely
+        try:
+            max_size = int(max_size)
+        except Exception:
+            raise ValueError(f"max_size must be an int or float('inf'), got {type(max_size)}: {max_size}")
+
         return paths[:max_size]
 
     def __getitem__(self, index):
@@ -47,9 +55,9 @@ class AlignedDataset16Bit(BaseDataset):
         B = TF.center_crop(B, [self.opt.crop_size, self.opt.crop_size])
 
         # Normalize to [-1, 1] if needed
-        if not self.opt.no_normalize:
-            A = A * 2 - 1
-            B = B * 2 - 1
+        # if not self.opt.no_normalize:
+        #     A = A * 2 - 1
+        #     B = B * 2 - 1
 
         return {'A': A, 'B': B, 'A_paths': AB_path, 'B_paths': AB_path}
 
