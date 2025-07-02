@@ -9,38 +9,39 @@ import os
 import numpy as np
 import torch
 
-def tensor2im(input_image, imtype=np.uint8):
+def tensor2im_16bit(input_image, imtype=np.uint16):
     """
-    Convert a Tensor to a numpy image. Supports 8-bit and 16-bit outputs.
+    Converts a torch Tensor into a 16-bit numpy image array suitable for saving.
+    Assumes input is in [-1, 1] and converts to [0, 65535].
     """
-    if imtype == np.uint16:
-        return tensor2im_16bit(input_image, imtype=np.uint16)
+
+    if isinstance(input_image, torch.Tensor):
+        image_tensor = input_image.detach().cpu().float()
     else:
-        # Default: 8-bit logic
-        if isinstance(input_image, torch.Tensor):
-            image_tensor = input_image.detach().cpu().float()
-        else:
-            return input_image
+        return input_image
 
-        if image_tensor.ndim == 4:
-            image_numpy = image_tensor[0].numpy()
-        elif image_tensor.ndim == 3:
-            image_numpy = image_tensor.numpy()
-        else:
-            raise ValueError(f"Unexpected tensor shape: {image_tensor.shape}")
+    # Handle shape: [1, C, H, W] or [C, H, W]
+    if image_tensor.ndim == 4:
+        image_numpy = image_tensor[0].numpy()  # take first in batch
+    elif image_tensor.ndim == 3:
+        image_numpy = image_tensor.numpy()
+    else:
+        raise ValueError(f"Unexpected tensor shape: {image_tensor.shape}")
 
-        image_numpy = np.clip(image_numpy, -1, 1)
-        image_numpy = ((image_numpy + 1) / 2.0) * 255.0
-        image_numpy = np.clip(image_numpy, 0, 255).astype(np.uint8)
+    # Clip to valid range and rescale
+    image_numpy = np.clip(image_numpy, -1.0, 1.0)
+    image_numpy = ((image_numpy + 1.0) / 2.0) * 65535.0  # [-1,1] → [0,65535]
+    image_numpy = np.clip(image_numpy, 0, 65535).astype(imtype)
 
-        if image_numpy.ndim == 3:
-            image_numpy = np.transpose(image_numpy, (1, 2, 0))
+    # Transpose from [C, H, W] to [H, W, C] if needed
+    if image_numpy.ndim == 3:
+        image_numpy = np.transpose(image_numpy, (1, 2, 0))
 
-        if image_numpy.shape[-1] == 1:
-            image_numpy = image_numpy[:, :, 0]
+    # Squeeze single-channel last dim (optional, for saving as grayscale)
+    if image_numpy.shape[-1] == 1:
+        image_numpy = image_numpy[:, :, 0]
 
-        return image_numpy
-
+    return image_numpy
 
 
 
