@@ -56,8 +56,8 @@ class AlignedDataset16BitDataset(BaseDataset):
 
         # Normalize to [-1, 1] if needed
         # if not self.opt.no_normalize:
-        #     A = A * 2 - 1
-        #     B = B * 2 - 1
+        A = A * 2 - 1
+        B = B * 2 - 1
 
         return {'A': A, 'B': B, 'A_paths': AB_path, 'B_paths': AB_path}
 

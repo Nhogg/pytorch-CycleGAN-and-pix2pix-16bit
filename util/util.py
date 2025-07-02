@@ -6,35 +6,41 @@ from PIL import Image
 import os
 
 
-def tensor2im_16bit(input_image, imtype=np.uint16):
-    """Converts a Tensor into a 16-bit numpy image array."""
+import numpy as np
+import torch
 
-    if isinstance(input_image, torch.Tensor):
-        image_tensor = input_image.data
+def tensor2im(input_image, imtype=np.uint8):
+    """
+    Convert a Tensor to a numpy image. Supports 8-bit and 16-bit outputs.
+    """
+    if imtype == np.uint16:
+        return tensor2im_16bit(input_image, imtype=np.uint16)
     else:
-        return input_image
+        # Default: 8-bit logic
+        if isinstance(input_image, torch.Tensor):
+            image_tensor = input_image.detach().cpu().float()
+        else:
+            return input_image
 
-    # Assuming image is 1xCxHxW or CxHxW
-    image_numpy = image_tensor[0].cpu().float().numpy() if image_tensor.ndim == 4 else image_tensor.cpu().float().numpy()
+        if image_tensor.ndim == 4:
+            image_numpy = image_tensor[0].numpy()
+        elif image_tensor.ndim == 3:
+            image_numpy = image_tensor.numpy()
+        else:
+            raise ValueError(f"Unexpected tensor shape: {image_tensor.shape}")
 
-    # Clamp to [-1, 1] or [0, 1] depending on your model
-    image_numpy = np.clip(image_numpy, -1, 1)
+        image_numpy = np.clip(image_numpy, -1, 1)
+        image_numpy = ((image_numpy + 1) / 2.0) * 255.0
+        image_numpy = np.clip(image_numpy, 0, 255).astype(np.uint8)
 
-    # Convert from [-1, 1] to [0, 65535]
-    image_numpy = ((image_numpy + 1) / 2.0) * 65535.0
+        if image_numpy.ndim == 3:
+            image_numpy = np.transpose(image_numpy, (1, 2, 0))
 
-    # Convert to uint16
-    image_numpy = np.clip(image_numpy, 0, 65535).astype(imtype)
+        if image_numpy.shape[-1] == 1:
+            image_numpy = image_numpy[:, :, 0]
 
-    # If single-channel, shape = (H, W), expand to (H, W, 1)
-    if image_numpy.ndim == 2:
-        image_numpy = image_numpy[:, :, np.newaxis]
+        return image_numpy
 
-    # Transpose from (C, H, W) to (H, W, C)
-    if image_numpy.shape[0] <= 4:  # assume channel first
-        image_numpy = np.transpose(image_numpy, (1, 2, 0))
-
-    return image_numpy
 
 
 
@@ -58,22 +64,28 @@ def diagnose_network(net, name='network'):
 
 
 from PIL import Image
-
-from PIL import Image
-
-from PIL import Image
 import numpy as np
 
-def save_image(image_numpy, image_path, aspect_ratio=1.0):
+def save_image(image_numpy, image_path, aspect_ratio=1.0, imtype=np.uint8):
+    """
+    Save a numpy image to the disk as 8-bit or 16-bit based on dtype.
+    """
     if image_numpy.ndim == 3 and image_numpy.shape[0] == 1:
         image_numpy = np.squeeze(image_numpy, axis=0)
 
-    image_pil = Image.fromarray(image_numpy.astype(np.uint16), mode='I;16')
+    h, w = image_numpy.shape[:2]
+    if aspect_ratio > 1.0:
+        image_numpy = np.array(Image.fromarray(image_numpy).resize((int(w * aspect_ratio), h)))
+    elif aspect_ratio < 1.0:
+        image_numpy = np.array(Image.fromarray(image_numpy).resize((w, int(h * aspect_ratio))))
+
+    # Convert numpy to PIL image with correct mode
+    if imtype == np.uint16:
+        image_pil = Image.fromarray(image_numpy.astype(np.uint16), mode='I;16')
+    else:
+        image_pil = Image.fromarray(image_numpy.astype(np.uint8))
+
     image_pil.save(image_path)
-
-
-
-
 
 
 def print_numpy(x, val=True, shp=False):
